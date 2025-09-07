@@ -1,63 +1,16 @@
-/******************************************************************************
-*
-* Copyright (C) 2009 - 2014 Xilinx, Inc.  All rights reserved.
-*
-* Permission is hereby granted, free of charge, to any person obtaining a copy
-* of this software and associated documentation files (the "Software"), to deal
-* in the Software without restriction, including without limitation the rights
-* to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-* copies of the Software, and to permit persons to whom the Software is
-* furnished to do so, subject to the following conditions:
-*
-* The above copyright notice and this permission notice shall be included in
-* all copies or substantial portions of the Software.
-*
-* Use of the Software is limited solely to applications:
-* (a) running on a Xilinx device, or
-* (b) that interact with a Xilinx device through a bus or interconnect.
-*
-* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
-* XILINX  BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-* WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF
-* OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-* SOFTWARE.
-*
-* Except as contained in this notice, the name of the Xilinx shall not be used
-* in advertising or otherwise to promote the sale, use or other dealings in
-* this Software without prior written authorization from Xilinx.
-*
-******************************************************************************/
-
-/*
- * helloworld.c: simple test application
- *
- * This application configures UART 16550 to baud rate 9600.
- * PS7 UART (Zynq) is not initialized by this application, since
- * bootrom/bsp configures it to baud rate 115200
- *
- * ------------------------------------------------
- * | UART TYPE   BAUD RATE                        |
- * ------------------------------------------------
- *   uartns550   9600
- *   uartlite    Configurable only in HW design
- *   ps7_uart    115200 (configured by bootrom/bsp)
- */
 
 #include <stdio.h>
-#include "platform.h"
-#include "xil_printf.h"
 #include "xgpiops.h"
+
+//interrupts
+#include "xscugic.h"
 
 // needed for USB
 #include "xparameters.h"
 #include "xusbps.h"
-#include "xscugic.h"
 #include "xil_exception.h"
 #include "xil_cache.h"
 #include "xusbps_ch9.h"
-
 #include "usb_bulk.h"
 
 /************************** Constant Definitions *****************************/
@@ -75,40 +28,39 @@ u8 Buffer[MEMORY_SIZE] ALIGNMENT_CACHELINE;
 
 /************************** Function Prototypes ******************************/
 
-static int UsbIntrInit(XScuGic *IntcInstancePtr, XUsbPs *UsbInstancePtr,
-		u16 UsbDeviceId, u16 UsbIntrId);
+static int UsbIntrInit(XUsbPs *UsbInstancePtr, u16 UsbDeviceId, u16 UsbIntrId);
 
 static void UsbIntrHandler(void *CallBackRef, u32 Mask);
 static void XUsbPs_Ep0EventHandler(void *CallBackRef, u8 EpNum, u8 EventType,
 		void *Data);
 static void XUsbPs_Ep1EventHandler(void *CallBackRef, u8 EpNum, u8 EventType,
 		void *Data);
-static int UsbSetupIntrSystem(XScuGic *IntcInstancePtr, XUsbPs *UsbInstancePtr,
-		u16 UsbIntrId);
+
 static void UsbDisableIntrSystem(XScuGic *IntcInstancePtr, u16 UsbIntrId);
 
 /************************** Variable Definitions  *****************************/
 
-static XScuGic IntcInstance; /* IRQ Controller */
-static XUsbPs UsbInstance; /* USB Controller */
+static XGpioPs Gpio; /* GPIO object */
+static XScuGic Gic; /* Interrupt controller */
 
-static volatile int NumIrqs = 0;
-static volatile int NumReceivedFrames = 0;
+static XUsbPs UsbInstance; /* USB Controller */
 static XUsbPs_Local UsbLocal;
 
+static volatile int NumIrqs = 0;
 
-#define LED_MIO        0
+#define LED_MIO        0 	//GPIO0 - debug pin on Pluto
 
+#define GPIOPS0_DEV_ID		XPAR_XGPIOPS_0_DEVICE_ID
+#define GIC_DEV_ID     		XPAR_SCUGIC_0_DEVICE_ID
+#define FINTR_ID        	XPS_FPGA0_INT_ID
 
-static XGpioPs  Gpio;
-
-
-
+#define USB_DEV_ID          XPAR_XUSBPS_0_DEVICE_ID
+#define USB_INTR_ID         XPAR_XUSBPS_0_INTR
 
 int gpio_init(void) {
 	XGpioPs_Config *GpioCfg;
 
-	GpioCfg = XGpioPs_LookupConfig(XPAR_XGPIOPS_0_DEVICE_ID);
+	GpioCfg = XGpioPs_LookupConfig(GPIOPS0_DEV_ID);
 	if (GpioCfg == NULL) {
 		return XST_FAILURE;
 	}
@@ -117,72 +69,96 @@ int gpio_init(void) {
 		return XST_FAILURE;
 	}
 
-
-
-	// LED_MIO ÐºÐ°Ðº output
+	// LED_MIO Debug output
 	XGpioPs_SetDirectionPin(&Gpio, LED_MIO, 1);
 	XGpioPs_SetOutputEnablePin(&Gpio, LED_MIO, 1);
-	XGpioPs_WritePin(&Gpio, LED_MIO, 1);   // Ñ�Ñ€Ð°Ð·Ñƒ Ð·Ð°Ð¶ÐµÑ‡ÑŒ
-
-
-
-
+	XGpioPs_WritePin(&Gpio, LED_MIO, 1);   // Initial value
 
 	return XST_SUCCESS;
 }
 
-int blink_led_toggle_20(void)
-{
+int blink_led_toggle_20(void) {
 
+	int val = XGpioPs_ReadPin(&Gpio, LED_MIO) ? 1 : 0;
+	for (int i = 0; i < 20; ++i) {
+		val ^= 1;
+		XGpioPs_WritePin(&Gpio, LED_MIO, val);
+		usleep(500000);
+	}
 
-    int val = XGpioPs_ReadPin(&Gpio, LED_MIO) ? 1 : 0;
-    for (int i = 0; i < 5; ++i) {
-        val ^= 1;
-        XGpioPs_WritePin(&Gpio, LED_MIO, val);
-        usleep(500000);
-    }
-
-    return XST_SUCCESS;
+	return XST_SUCCESS;
 }
 
+static int GicInitOnce(u16 GicDevId) {
+	XScuGic_Config *Cfg = XScuGic_LookupConfig(GicDevId);
+	if (!Cfg)
+		return XST_FAILURE;
 
+	int Status = XScuGic_CfgInitialize(&Gic, Cfg, Cfg->CpuBaseAddress);
+	if (Status != XST_SUCCESS)
+		return Status;
 
-int main()
-{
+	Xil_ExceptionInit();
+	Xil_ExceptionRegisterHandler(XIL_EXCEPTION_ID_IRQ_INT,
+			(Xil_ExceptionHandler) XScuGic_InterruptHandler, &Gic);
+	Xil_ExceptionEnableMask(XIL_EXCEPTION_IRQ);
+	return XST_SUCCESS;
+}
 
+static void IrqHandler(void *Ref) {
+	static int led = 0;
+	led ^= 1;
+	XGpioPs_WritePin(&Gpio, LED_MIO, led);
+}
 
+static int ConnectPlIrq(u32 FabricIntrId) {
+	XScuGic_SetPriorityTriggerType(&Gic, FabricIntrId, 0xB0, 0x3); // 0x1 = level-high, 0x3 = rising-edge
+	int Status = XScuGic_Connect(&Gic, FabricIntrId,
+			(Xil_ExceptionHandler) IrqHandler, NULL);
+	if (Status != XST_SUCCESS)
+		return Status;
+	XScuGic_Enable(&Gic, FabricIntrId);
+	return XST_SUCCESS;
+}
 
-	// init_platform();
+int main() {
+
 	gpio_init();
+	blink_led_toggle_20();
 
+	GicInitOnce(GIC_DEV_ID); /* 1) Init GIC once */
 
+	/* 2) Init USB controller + its IRQ */
+	UsbLocal.CurrentConfig = 0;
+	UsbInstance.UserDataPtr = &UsbLocal;
+	UsbIntrInit(&UsbInstance, USB_DEV_ID, USB_INTR_ID);
 
+	/* 3) Connect IRQ from PL to the same GIC */
+	ConnectPlIrq(FINTR_ID);
 
-
-
-    UsbLocal.CurrentConfig = 0;
-    	UsbInstance.UserDataPtr = &UsbLocal;
-
-    	int Status = UsbIntrInit(&IntcInstance, &UsbInstance,
-    			XPAR_XUSBPS_0_DEVICE_ID, XPAR_XUSBPS_0_INTR);
-
-    	blink_led_toggle_20();
-
-    	while (1) {
-    		/* main loop */
-    	}
-
-
-//    cleanup_platform();
-//      return 0;
-
+	while (1) {
+	}
 
 }
-
 
 /*****************************************************************************/
-static int UsbIntrInit(XScuGic *IntcInstancePtr, XUsbPs *UsbInstancePtr,
-		u16 UsbDeviceId, u16 UsbIntrId) {
+
+static int ConnectUsbIrq(XUsbPs *UsbInstancePtr, u16 UsbIntrId) {
+	/* USBPS on Zynq usually level-high */
+	XScuGic_SetPriorityTriggerType(&Gic, UsbIntrId, /*priority*/0xA0, /*level*/
+			0x1);
+
+	int Status = XScuGic_Connect(&Gic, UsbIntrId,
+			(Xil_ExceptionHandler) XUsbPs_IntrHandler,  // ISR from USB driver
+			(void*) UsbInstancePtr);
+	if (Status != XST_SUCCESS)
+		return Status;
+
+	XScuGic_Enable(&Gic, UsbIntrId);
+	return XST_SUCCESS;
+}
+
+static int UsbIntrInit(XUsbPs *UsbInstancePtr, u16 UsbDeviceId, u16 UsbIntrId) {
 	int Status;
 	u8 *MemPtr = NULL;
 	int ReturnStatus = XST_FAILURE;
@@ -203,7 +179,8 @@ static int UsbIntrInit(XScuGic *IntcInstancePtr, XUsbPs *UsbInstancePtr,
 		goto out;
 	}
 
-	Status = UsbSetupIntrSystem(IntcInstancePtr, UsbInstancePtr, UsbIntrId);
+	Status = ConnectUsbIrq(UsbInstancePtr, UsbIntrId);
+
 	if (XST_SUCCESS != Status) {
 		goto out;
 	}
@@ -322,8 +299,6 @@ static void XUsbPs_Ep1EventHandler(void *CallBackRef, u8 EpNum, u8 EventType,
 			u32 invLen = (BufferLen + 31u) & ~31u;
 			Xil_DCacheInvalidateRange((UINTPTR) BufferPtr, invLen);
 
-			/* Ñ‚Ð²Ð¾Ð¹ Ð¿Ð¾Ð»ÑŒÐ·Ð¾Ð²Ð°Ñ‚ÐµÐ»ÑŒÑ�ÐºÐ¸Ð¹ Ð¾Ð±Ñ€Ð°Ð±Ð¾Ñ‚Ñ‡Ð¸Ðº bulk */
-			//XUsbPs_HandleDeviceReq(InstancePtr, EpNum, BufferPtr, BufferLen);
 			usb_bulk_init(InstancePtr, 1, 1, 512);
 
 			XUsbPs_EpBufferRelease(Handle);
@@ -337,38 +312,6 @@ static void XUsbPs_Ep1EventHandler(void *CallBackRef, u8 EpNum, u8 EventType,
 	}
 }
 
-/*****************************************************************************/
-static int UsbSetupIntrSystem(XScuGic *IntcInstancePtr, XUsbPs *UsbInstancePtr,
-		u16 UsbIntrId) {
-	int Status;
-	XScuGic_Config *IntcConfig;
-
-	IntcConfig = XScuGic_LookupConfig(XPAR_SCUGIC_SINGLE_DEVICE_ID);
-	if (NULL == IntcConfig) {
-		return XST_FAILURE;
-	}
-	Status = XScuGic_CfgInitialize(IntcInstancePtr, IntcConfig,
-			IntcConfig->CpuBaseAddress);
-	if (Status != XST_SUCCESS) {
-		return XST_FAILURE;
-	}
-
-	Xil_ExceptionInit();
-
-	Xil_ExceptionRegisterHandler(XIL_EXCEPTION_ID_IRQ_INT,
-			(Xil_ExceptionHandler) XScuGic_InterruptHandler, IntcInstancePtr);
-
-	Status = XScuGic_Connect(IntcInstancePtr, UsbIntrId,
-			(Xil_ExceptionHandler) XUsbPs_IntrHandler, (void *) UsbInstancePtr);
-	if (Status != XST_SUCCESS) {
-		return Status;
-	}
-
-	XScuGic_Enable(IntcInstancePtr, UsbIntrId);
-	Xil_ExceptionEnableMask(XIL_EXCEPTION_IRQ);
-
-	return XST_SUCCESS;
-}
 
 /*****************************************************************************/
 static void UsbDisableIntrSystem(XScuGic *IntcInstancePtr, u16 UsbIntrId) {
