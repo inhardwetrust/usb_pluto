@@ -1,31 +1,4 @@
-/******************************************************************************
-*
-* Copyright (C) 2010 - 2015 Xilinx, Inc.  All rights reserved.
-*
-* Permission is hereby granted, free of charge, to any person obtaining a copy
-* of this software and associated documentation files (the "Software"), to deal
-* in the Software without restriction, including without limitation the rights
-* to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-* copies of the Software, and to permit persons to whom the Software is
-* furnished to do so, subject to the following conditions:
-*
-* The above copyright notice and this permission notice shall be included in
-* all copies or substantial portions of the Software.
-*
-* THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-* IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-* FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
-* XILINX  BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-* WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF
-* OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-* SOFTWARE.
-*
-* Except as contained in this notice, the name of the Xilinx shall not be used
-* in advertising or otherwise to promote the sale, use or other dealings in
-* this Software without prior written authorization from Xilinx.
-*
-******************************************************************************/
-/*****************************************************************************/
+
 /**
  * @file xusbps_ch9.c
  *
@@ -481,7 +454,7 @@ static u8  	Reply[XUSBPS_REQ_REPLY_LEN];
 
 #define REQ_GET_FW_VERSION   0x31  // IN, Device
 #define REQ_SET_LED          0x32  // OUT, Device
-#define REQ_READ_REG         0x33  // IN,  Interface (Ð¿Ñ€Ð¸Ð¼ÐµÑ€)
+#define REQ_READ_REG         0x33  // IN,  Interface (Ã�Â¿Ã‘â‚¬Ã�Â¸Ã�Â¼Ã�ÂµÃ‘â‚¬)
 #define REQ_WRITE_REG        0x34  // OUT, Interface
 
 static int XUsbPs_HandleVendorReq(XUsbPs *InstancePtr, XUsbPs_SetupData *S)
@@ -489,7 +462,7 @@ static int XUsbPs_HandleVendorReq(XUsbPs *InstancePtr, XUsbPs_SetupData *S)
     const u8 Ep0 = 0;
     const int isIn = (S->bmRequestType & 0x80) != 0;
 
-    // 1) MS WCID (Ð¾Ñ�Ñ‚Ð°Ð²Ð»Ñ�ÐµÐ¼ ÐºÐ°Ðº ÐµÑ�Ñ‚ÑŒ)
+    // 1) MS WCID (Ã�Â¾Ã‘ï¿½Ã‘â€šÃ�Â°Ã�Â²Ã�Â»Ã‘ï¿½Ã�ÂµÃ�Â¼ Ã�ÂºÃ�Â°Ã�Âº Ã�ÂµÃ‘ï¿½Ã‘â€šÃ‘Å’)
     if ((u8)S->bRequest == MS_OS_10_VENDOR_CODE) {
         if (!isIn) { XUsbPs_EpStall(InstancePtr, Ep0, XUSBPS_EP_DIRECTION_OUT); return XST_FAILURE; }
         if (S->wIndex == 0x0004) {
@@ -506,29 +479,29 @@ static int XUsbPs_HandleVendorReq(XUsbPs *InstancePtr, XUsbPs_SetupData *S)
 //
 //    case REQ_GET_FW_VERSION: {           // IN, return two byted
 //        if (!isIn) { XUsbPs_EpStall(InstancePtr, Ep0, XUSBPS_EP_DIRECTION_OUT); return XST_FAILURE; }
-//        u8 reply[4] = { 0x01, 0x00, 0x00, 0x00 }; // v1.0 (Ð¿Ñ€Ð¸Ð¼ÐµÑ€)
+//        u8 reply[4] = { 0x01, 0x00, 0x00, 0x00 }; // v1.0 (Ã�Â¿Ã‘â‚¬Ã�Â¸Ã�Â¼Ã�ÂµÃ‘â‚¬)
 //        u32 n = (S->wLength < sizeof(reply)) ? S->wLength : sizeof(reply);
 //        return XUsbPs_EpBufferSend(InstancePtr, Ep0, reply, n);
 //    }
 //
-    case REQ_SET_LED: {                  // OUT, 1 Ð±Ð°Ð¹Ñ‚ payload
+    case REQ_SET_LED: {                  // OUT, 1 Ã�Â±Ã�Â°Ã�Â¹Ã‘â€š payload
         if (isIn || S->wLength == 0) {
             XUsbPs_EpStall(InstancePtr, Ep0, XUSBPS_EP_DIRECTION_IN);
             return XST_FAILURE;
         }
 
-        // 1) Re-prime EP0 OUT Ð½Ð° data phase
+        // 1) Re-prime EP0 OUT Ã�Â½Ã�Â° data phase
         XUsbPs_EpPrime(InstancePtr, Ep0, XUSBPS_EP_DIRECTION_OUT);
 
-        // 2) ÐŸÐ¾Ð´Ð¾Ð¶Ð´Ð°Ñ‚ÑŒ, Ð¿Ð¾ÐºÐ° Ð±Ð¸Ñ‚ PRIME ÑƒÑ�Ñ‚Ð°Ð½Ð¾Ð²Ð¸Ñ‚Ñ�Ñ�/Ñ�Ð±Ñ€Ð¾Ñ�Ð¸Ñ‚Ñ�Ñ�
-        int Timeout = XUSBPS_TIMEOUT_COUNTER;   // Ð²Ð¾Ð·ÑŒÐ¼Ð¸ ÐºÐ°Ðº Ð² ÑˆÐ°Ð±Ð»Ð¾Ð½Ðµ (Ð½Ð°Ð¿Ñ€. 1000000)
+        // 2) Ã�Å¸Ã�Â¾Ã�Â´Ã�Â¾Ã�Â¶Ã�Â´Ã�Â°Ã‘â€šÃ‘Å’, Ã�Â¿Ã�Â¾Ã�ÂºÃ�Â° Ã�Â±Ã�Â¸Ã‘â€š PRIME Ã‘Æ’Ã‘ï¿½Ã‘â€šÃ�Â°Ã�Â½Ã�Â¾Ã�Â²Ã�Â¸Ã‘â€šÃ‘ï¿½Ã‘ï¿½/Ã‘ï¿½Ã�Â±Ã‘â‚¬Ã�Â¾Ã‘ï¿½Ã�Â¸Ã‘â€šÃ‘ï¿½Ã‘ï¿½
+        int Timeout = XUSBPS_TIMEOUT_COUNTER;   // Ã�Â²Ã�Â¾Ã�Â·Ã‘Å’Ã�Â¼Ã�Â¸ Ã�ÂºÃ�Â°Ã�Âº Ã�Â² Ã‘Ë†Ã�Â°Ã�Â±Ã�Â»Ã�Â¾Ã�Â½Ã�Âµ (Ã�Â½Ã�Â°Ã�Â¿Ã‘â‚¬. 1000000)
         u32 reg;
         do {
             reg = XUsbPs_ReadReg(InstancePtr->Config.BaseAddress, XUSBPS_EPPRIME_OFFSET);
         } while (((reg & (1u << Ep0)) != 0u) && --Timeout);
         if (!Timeout) return XST_FAILURE;
 
-        // 3) Ð—Ð°Ð±Ñ€Ð°Ñ‚ÑŒ payload Ñ� EP0 OUT (Ð½Ðµ Ð¶Ð´Ñ‘Ð¼ IRQ)
+        // 3) Ã�â€”Ã�Â°Ã�Â±Ã‘â‚¬Ã�Â°Ã‘â€šÃ‘Å’ payload Ã‘ï¿½ EP0 OUT (Ã�Â½Ã�Âµ Ã�Â¶Ã�Â´Ã‘â€˜Ã�Â¼ IRQ)
         u8  *buf; u32 len; u32 handle;
         Timeout = XUSBPS_TIMEOUT_COUNTER;
         int st;
@@ -537,16 +510,16 @@ static int XUsbPs_HandleVendorReq(XUsbPs *InstancePtr, XUsbPs_SetupData *S)
         } while ((st != XST_SUCCESS) && --Timeout);
         if (!Timeout) return XST_FAILURE;
 
-        // 4) Ð˜Ð½Ð²Ð°Ð»Ð¸Ð´Ð¸Ñ€ÑƒÐµÐ¼ ÐºÑ�Ñˆ Ð¸ Ð¿Ñ€Ð¸Ð¼ÐµÐ½Ñ�ÐµÐ¼
+        // 4) Ã�ËœÃ�Â½Ã�Â²Ã�Â°Ã�Â»Ã�Â¸Ã�Â´Ã�Â¸Ã‘â‚¬Ã‘Æ’Ã�ÂµÃ�Â¼ Ã�ÂºÃ‘ï¿½Ã‘Ë† Ã�Â¸ Ã�Â¿Ã‘â‚¬Ã�Â¸Ã�Â¼Ã�ÂµÃ�Â½Ã‘ï¿½Ã�ÂµÃ�Â¼
         Xil_DCacheInvalidateRange((UINTPTR)buf, len);
         if (len >= 1) {
-            // !!! Ð·Ð´ÐµÑ�ÑŒ Ñ€ÐµÐ°Ð»ÑŒÐ½Ð¾Ðµ ÑƒÐ¿Ñ€Ð°Ð²Ð»ÐµÐ½Ð¸Ðµ Ð¿Ð¸Ð½Ð¾Ð¼
-            //XGpioPs_WritePin(&Gpio, LED_MIO, (buf[0] & 1));  // 0/1 Ð¸Ð· payload
-            // Ð´Ð»Ñ� Ð¾Ñ‚Ð»Ð°Ð´ÐºÐ¸ Ð¼Ð¾Ð¶Ð½Ð¾ Ð²Ñ‹Ð²ÐµÑ�Ñ‚Ð¸:
+            // !!! Ã�Â·Ã�Â´Ã�ÂµÃ‘ï¿½Ã‘Å’ Ã‘â‚¬Ã�ÂµÃ�Â°Ã�Â»Ã‘Å’Ã�Â½Ã�Â¾Ã�Âµ Ã‘Æ’Ã�Â¿Ã‘â‚¬Ã�Â°Ã�Â²Ã�Â»Ã�ÂµÃ�Â½Ã�Â¸Ã�Âµ Ã�Â¿Ã�Â¸Ã�Â½Ã�Â¾Ã�Â¼
+            //XGpioPs_WritePin(&Gpio, LED_MIO, (buf[0] & 1));  // 0/1 Ã�Â¸Ã�Â· payload
+            // Ã�Â´Ã�Â»Ã‘ï¿½ Ã�Â¾Ã‘â€šÃ�Â»Ã�Â°Ã�Â´Ã�ÂºÃ�Â¸ Ã�Â¼Ã�Â¾Ã�Â¶Ã�Â½Ã�Â¾ Ã�Â²Ã‘â€¹Ã�Â²Ã�ÂµÃ‘ï¿½Ã‘â€šÃ�Â¸:
             // xil_printf("SET_LED: val=%d len=%lu\r\n", buf[0], (unsigned long)len);
         }
 
-        // 5) ÐžÑ�Ð²Ð¾Ð±Ð¾Ð¶Ð´Ð°ÐµÐ¼ Ð±ÑƒÑ„ÐµÑ€ Ð¸ ÑˆÐ»Ñ‘Ð¼ ZLP (status stage)
+        // 5) Ã�Å¾Ã‘ï¿½Ã�Â²Ã�Â¾Ã�Â±Ã�Â¾Ã�Â¶Ã�Â´Ã�Â°Ã�ÂµÃ�Â¼ Ã�Â±Ã‘Æ’Ã‘â€žÃ�ÂµÃ‘â‚¬ Ã�Â¸ Ã‘Ë†Ã�Â»Ã‘â€˜Ã�Â¼ ZLP (status stage)
         XUsbPs_EpBufferRelease(handle);
         return XUsbPs_EpBufferSend(InstancePtr, Ep0, NULL, 0);
     }
@@ -572,7 +545,7 @@ static int XUsbPs_HandleVendorReq(XUsbPs *InstancePtr, XUsbPs_SetupData *S)
 //    }
 //
     default:
-        // Unknown vendor-request â†’ STALL to request
+        // Unknown vendor-request Ã¢â€ â€™ STALL to request
         XUsbPs_EpStall(InstancePtr, Ep0, isIn ? XUSBPS_EP_DIRECTION_IN : XUSBPS_EP_DIRECTION_OUT);
         return XST_FAILURE;
     }

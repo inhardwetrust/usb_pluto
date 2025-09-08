@@ -10,8 +10,9 @@
 #include "xusbps.h"
 #include "xil_exception.h"
 #include "xil_cache.h"
-#include "xusbps_ch9.h"
+
 #include "usb_bulk.h"
+#include "xusbps_ch9.h"
 
 /************************** Constant Definitions *****************************/
 
@@ -124,7 +125,7 @@ static int ConnectPlIrq(u32 FabricIntrId) {
 int main() {
 
 	gpio_init();
-	blink_led_toggle_20();
+
 
 	GicInitOnce(GIC_DEV_ID); /* 1) Init GIC once */
 
@@ -135,6 +136,9 @@ int main() {
 
 	/* 3) Connect IRQ from PL to the same GIC */
 	ConnectPlIrq(FINTR_ID);
+
+
+	blink_led_toggle_20();
 
 	while (1) {
 	}
@@ -213,6 +217,8 @@ static int UsbIntrInit(XUsbPs *UsbInstancePtr, u16 UsbDeviceId, u16 UsbIntrId) {
 	if (XST_SUCCESS != Status) {
 		goto out;
 	}
+
+
 
 	Status = XUsbPs_IntrSetHandler(UsbInstancePtr, UsbIntrHandler, NULL,
 	XUSBPS_IXR_UE_MASK);
@@ -299,7 +305,6 @@ static void XUsbPs_Ep1EventHandler(void *CallBackRef, u8 EpNum, u8 EventType,
 			u32 invLen = (BufferLen + 31u) & ~31u;
 			Xil_DCacheInvalidateRange((UINTPTR) BufferPtr, invLen);
 
-			usb_bulk_init(InstancePtr, 1, 1, 512);
 
 			XUsbPs_EpBufferRelease(Handle);
 		}
