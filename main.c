@@ -137,6 +137,12 @@ int main() {
 	/* 3) Connect IRQ from PL to the same GIC */
 	ConnectPlIrq(FINTR_ID);
 
+	//One send to EP1
+	static u8 txbuf[1500] ALIGNMENT_CACHELINE; ///buffer
+
+	Xil_DCacheFlushRange((UINTPTR)txbuf, sizeof(txbuf)); // Mandatory Flush before payload
+	int st = XUsbPs_EpBufferSend(&UsbInstance, /*ep=*/1, txbuf, sizeof(txbuf)); ///send
+
 
 	blink_led_toggle_20();
 
@@ -218,7 +224,11 @@ static int UsbIntrInit(XUsbPs *UsbInstancePtr, u16 UsbDeviceId, u16 UsbIntrId) {
 		goto out;
 	}
 
-
+	/// this is custom - not pure driver
+		//Register my handler - invoked after Device-to-host transfer is ended
+		XUsbPs_EpSetHandler(&UsbInstance, 1, XUSBPS_EP_DIRECTION_IN,
+		                    Ep1_In_Handler, &UsbInstance);
+		//// end of Custom function insert
 
 	Status = XUsbPs_IntrSetHandler(UsbInstancePtr, UsbIntrHandler, NULL,
 	XUSBPS_IXR_UE_MASK);
