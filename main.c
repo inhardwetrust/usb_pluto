@@ -41,7 +41,7 @@ static void UsbDisableIntrSystem(XScuGic *IntcInstancePtr, u16 UsbIntrId);
 
 /************************** Variable Definitions  *****************************/
 
-static XGpioPs Gpio; /* GPIO object */
+ XGpioPs Gpio; /* GPIO object */
 static XScuGic Gic; /* Interrupt controller */
 
 static XUsbPs UsbInstance; /* USB Controller */
@@ -125,6 +125,7 @@ static int ConnectPlIrq(u32 FabricIntrId) {
 int main() {
 
 	gpio_init();
+	usb_bulk_set_gpio(&Gpio, LED_MIO);
 
 
 	GicInitOnce(GIC_DEV_ID); /* 1) Init GIC once */
@@ -137,14 +138,10 @@ int main() {
 	/* 3) Connect IRQ from PL to the same GIC */
 	ConnectPlIrq(FINTR_ID);
 
-	//One send to EP1
-	static u8 txbuf[1500] ALIGNMENT_CACHELINE; ///buffer
-
-	Xil_DCacheFlushRange((UINTPTR)txbuf, sizeof(txbuf)); // Mandatory Flush before payload
-	int st = XUsbPs_EpBufferSend(&UsbInstance, /*ep=*/1, txbuf, sizeof(txbuf)); ///send
 
 
-	blink_led_toggle_20();
+
+	//blink_led_toggle_20();
 
 	while (1) {
 	}
@@ -225,6 +222,7 @@ static int UsbIntrInit(XUsbPs *UsbInstancePtr, u16 UsbDeviceId, u16 UsbIntrId) {
 	}
 
 	/// this is custom - not pure driver
+	usb_bulk_set_instance(UsbInstancePtr); // send instance to usb_bulk_file
 		//Register my handler - invoked after Device-to-host transfer is ended
 		XUsbPs_EpSetHandler(&UsbInstance, 1, XUSBPS_EP_DIRECTION_IN,
 		                    Ep1_In_Handler, &UsbInstance);

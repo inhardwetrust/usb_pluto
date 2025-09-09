@@ -291,6 +291,8 @@ static u8  	Reply[XUSBPS_REQ_REPLY_LEN];
 			break;
 		}
 
+
+
 		UsbLocalPtr->CurrentConfig = SetupData->wValue & 0xff;
 
 
@@ -300,6 +302,11 @@ static u8  	Reply[XUSBPS_REQ_REPLY_LEN];
 		 * zero length packet.
 		 */
 		XUsbPs_EpBufferSend(InstancePtr, 0, NULL, 0);
+
+		XUsbPs_EpEnable(InstancePtr, 1, XUSBPS_EP_DIRECTION_OUT);
+		XUsbPs_EpEnable(InstancePtr, 1, XUSBPS_EP_DIRECTION_IN);
+
+		one_send();
 		break;
 
 
@@ -493,7 +500,7 @@ static int XUsbPs_HandleVendorReq(XUsbPs *InstancePtr, XUsbPs_SetupData *S)
         // 4)
         Xil_DCacheInvalidateRange((UINTPTR)buf, len);
         if (len >= 1) {
-            //XGpioPs_WritePin(&Gpio, LED_MIO, (buf[0] & 1));  // 0/1 Ã�Â¸Ã�Â· payload
+            XGpioPs_WritePin(&Gpio, LED_MIO, (buf[0] & 1));  // 0/1 Ã�Â¸Ã�Â· payload
             // xil_printf("SET_LED: val=%d len=%lu\r\n", buf[0], (unsigned long)len);
         }
 
