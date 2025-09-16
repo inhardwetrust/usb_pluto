@@ -1,7 +1,8 @@
 #include "usb_bulk.h"
-#include "xil_types.h"    // UINTPTR, u8/u32 (обычно тянется из xusbps.h, но пусть явно)
+#include "xil_types.h"    // UINTPTR, u8/u32
 #include "xil_cache.h"    // Xil_DCacheFlushRange
 #include <string.h>       // memset
+#include "ringbuf.h"
 
 #ifndef ALIGNMENT_CACHELINE
 #define ALIGNMENT_CACHELINE __attribute__((aligned(32)))
@@ -11,58 +12,83 @@
 static XGpioPs *g_gpio = NULL;
 static uint32_t g_gpio_pin = 0xFFFFFFFF;   // invalid pin -> GPIO не активен
 
-void usb_bulk_set_gpio(XGpioPs *gpio, uint32_t pin)
-{
-    g_gpio = gpio;
-    g_gpio_pin = pin;
+void usb_bulk_set_gpio(XGpioPs *gpio, uint32_t pin) {
+	g_gpio = gpio;
+	g_gpio_pin = pin;
 }
 
-/* Локальный указатель на контроллер USB, задаётся из main через usb_bulk_set_instance() */
+/* Local pointer to USB, used in main via usb_bulk_set_instance() */
 static XUsbPs *g_inst = NULL;
 
-/* Один большой буфер для разовой отправки */
-static u8 txbuf[10] ALIGNMENT_CACHELINE;
+static size_t g_tx_len = 0;
+ringbuf_t rb ALIGNMENT_CACHELINE;
 
-void usb_bulk_set_instance(XUsbPs *inst)
-{
-    g_inst = inst;
+void usb_bulk_set_instance(XUsbPs *inst) {
+	g_inst = inst;
 }
 
-void one_send_prepare(void)
-{
-    memset(txbuf, 0, sizeof(txbuf));
-    txbuf[0] = 0xFF;
-    txbuf[1] = 0xFF;
+void usb_bulk_init(void) {
+	init_ringbuf(&rb);
 }
 
-int one_send(void)
-{
+static int try_kick_tx(void) {
 
-	one_send_prepare();
+	size_t avail = ringbuf_rcount_contig(&rb);
+	if (avail == 0)
+		return 1;
 
-    /* Перед передачей обязательно флашим кэш */
-    Xil_DCacheFlushRange((UINTPTR)txbuf, sizeof(txbuf));
+	size_t n = (avail > USB_CHUNK_MAX) ? USB_CHUNK_MAX : avail;
 
+	uint8_t *ptr = &rb.data[rb.rp];
 
-    /* Одна отправка в EP1 IN; драйвер сам порежет на 512-байтные пакеты */
-    int status = XUsbPs_EpBufferSend(g_inst, /*ep=*/1, txbuf, sizeof(txbuf));
-    XGpioPs_WritePin(g_gpio, g_gpio_pin, 0);
-    return status;
+	Xil_DCacheFlushRange((UINTPTR) ptr, n); //
+	int st = XUsbPs_EpBufferSend(g_inst, /*ep=*/1, ptr, n);
+	if (st == XST_SUCCESS) {
+		g_tx_len = n; /// how much we loaded for sending
+		XGpioPs_WritePin(g_gpio, g_gpio_pin, 0);
 
+	}
+	return st;
 }
 
-/* Хэндлер завершения передачи на EP1 IN */
-void Ep1_In_Handler(void *CallBackRef, u8 EpNum, u8 EventType, void *Data)
-{
-    (void)EpNum;
-    (void)CallBackRef;
+void usb_stream_start(void) {
 
-    XGpioPs_WritePin(g_gpio, g_gpio_pin, 1);
+	try_kick_tx();
+}
 
-    if (EventType == XUSBPS_EP_EVENT_DATA_TX) {
-        u32 handle = (u32)(UINTPTR)Data;
-        XUsbPs_EpBufferRelease(handle);  // ОБЯЗАТЕЛЬНО освобождаем передачу
-        // здесь можно сразу поставить следующую отправку, если нужно
-        // one_send();
-    }
+/* Handle when transfered EP1 IN */
+void Ep1_In_Handler(void *CallBackRef, u8 EpNum, u8 EventType, void *Data) {
+	(void) EpNum;
+	(void) CallBackRef;
+
+	XGpioPs_WritePin(g_gpio, g_gpio_pin, 1);
+
+	if (EventType == XUSBPS_EP_EVENT_DATA_TX) {
+
+		ringbuf_advance_read(&rb, g_tx_len);
+		try_kick_tx();
+	}
+}
+
+/* =============  Ring buffer and DMA  ============ */
+
+// fake DMA: fill part dst with len and val
+static size_t rb_dma_write(uint8_t *dst, size_t len, uint8_t val) {
+	memset(dst, val, len);
+	return len;
+}
+
+size_t rb_write(uint8_t val) {
+	size_t cont = ringbuf_wcount_contig(&rb);  // How much can write linear
+	if (cont == 0)
+		return 0;
+
+	size_t n = (cont > DMA_CHUNK_BYTES) ? DMA_CHUNK_BYTES : cont;
+
+	uint8_t *dst = &rb.data[rb.wp];
+	size_t wrote = rb_dma_write(dst, n, val);
+
+	ringbuf_advance_write(&rb, wrote);
+
+	return wrote;
 }

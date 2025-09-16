@@ -127,6 +127,8 @@ int main() {
 	gpio_init();
 	usb_bulk_set_gpio(&Gpio, LED_MIO);
 
+	usb_bulk_init();
+
 
 	GicInitOnce(GIC_DEV_ID); /* 1) Init GIC once */
 
@@ -143,8 +145,15 @@ int main() {
 
 	//blink_led_toggle_20();
 
-	while (1) {
-	}
+		uint8_t val = 1;
+
+		while (1) {
+			rb_write(val);
+			val++;
+			if (val > 24)
+				val = 0;
+			usleep(10);
+		}
 
 }
 
@@ -201,11 +210,11 @@ static int UsbIntrInit(XUsbPs *UsbInstancePtr, u16 UsbDeviceId, u16 UsbIntrId) {
 	DeviceConfig.EpCfg[0].In.MaxPacketSize = 64;
 
 	DeviceConfig.EpCfg[1].Out.Type = XUSBPS_EP_TYPE_BULK;
-	DeviceConfig.EpCfg[1].Out.NumBufs = 16;
+	DeviceConfig.EpCfg[1].Out.NumBufs = 0;
 	DeviceConfig.EpCfg[1].Out.BufSize = 512;
 	DeviceConfig.EpCfg[1].Out.MaxPacketSize = 512;
 	DeviceConfig.EpCfg[1].In.Type = XUSBPS_EP_TYPE_BULK;
-	DeviceConfig.EpCfg[1].In.NumBufs = 16;
+	DeviceConfig.EpCfg[1].In.NumBufs = 1;
 	DeviceConfig.EpCfg[1].In.MaxPacketSize = 512;
 
 	DeviceConfig.NumEndpoints = NumEndpoints;

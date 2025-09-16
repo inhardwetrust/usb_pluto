@@ -306,7 +306,8 @@ static u8  	Reply[XUSBPS_REQ_REPLY_LEN];
 		XUsbPs_EpEnable(InstancePtr, 1, XUSBPS_EP_DIRECTION_OUT);
 		XUsbPs_EpEnable(InstancePtr, 1, XUSBPS_EP_DIRECTION_IN);
 
-		one_send();
+		//one_send();
+		XGpioPs_WritePin(&Gpio, LED_MIO, 0);
 		break;
 
 
@@ -443,6 +444,7 @@ static u8  	Reply[XUSBPS_REQ_REPLY_LEN];
 #define REQ_SET_LED          0x32  // OUT, Device
 #define REQ_READ_REG         0x33  // IN,  Interface
 #define REQ_WRITE_REG        0x34  // OUT, Interface
+#define REQ_STREAM_START     0x35  //My Vendor request
 
 static int XUsbPs_HandleVendorReq(XUsbPs *InstancePtr, XUsbPs_SetupData *S)
 {
@@ -508,6 +510,17 @@ static int XUsbPs_HandleVendorReq(XUsbPs *InstancePtr, XUsbPs_SetupData *S)
         XUsbPs_EpBufferRelease(handle);
         return XUsbPs_EpBufferSend(InstancePtr, Ep0, NULL, 0);
     }
+
+    case REQ_STREAM_START: {          // EP0 OUT, wLength == 0
+            if (isIn || S->wLength != 0) {
+                XUsbPs_EpStall(InstancePtr, Ep0, XUSBPS_EP_DIRECTION_IN);
+                return XST_FAILURE;
+            }
+            // Никакой data phase — просто статусная ZLP после действия
+            usb_stream_start();
+            return XUsbPs_EpBufferSend(InstancePtr, Ep0, NULL, 0); // ZLP
+        }
+
 //
 //    case REQ_READ_REG: {                 // IN, address to wIndex/wValue
 //        if (!isIn) { XUsbPs_EpStall(InstancePtr, Ep0, XUSBPS_EP_DIRECTION_OUT); return XST_FAILURE; }
