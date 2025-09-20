@@ -4,6 +4,8 @@
 #include <string.h>       // memset
 #include "ringbuf.h"
 
+#include "dma_stuff.h"
+
 #ifndef ALIGNMENT_CACHELINE
 #define ALIGNMENT_CACHELINE __attribute__((aligned(32)))
 #endif
@@ -29,6 +31,7 @@ void usb_bulk_set_instance(XUsbPs *inst) {
 
 void usb_bulk_init(void) {
 	init_ringbuf(&rb);
+	dma_init();
 }
 
 static int try_kick_tx(void) {
@@ -86,9 +89,11 @@ size_t rb_write(uint8_t val) {
 	size_t n = (cont > DMA_CHUNK_BYTES) ? DMA_CHUNK_BYTES : cont;
 
 	uint8_t *dst = &rb.data[rb.wp];
-	size_t wrote = rb_dma_write(dst, n, val);
+	//size_t wrote = rb_dma_write(dst, n, val);  // fake DMA writer
+	size_t wrote = dma_s2mm_start(dst, n);
 
-	ringbuf_advance_write(&rb, wrote);
+
+	ringbuf_advance_write(&rb, n);
 
 	return wrote;
 }

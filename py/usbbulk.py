@@ -44,7 +44,7 @@ dev.ctrl_transfer(
 
 
 # сколько байт читать
-N = 8
+N = 64
 timeout_ms = 2000
 while True:
     data=None

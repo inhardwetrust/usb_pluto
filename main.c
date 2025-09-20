@@ -14,6 +14,8 @@
 #include "usb_bulk.h"
 #include "xusbps_ch9.h"
 
+
+
 /************************** Constant Definitions *****************************/
 
 #define ALIGNMENT_CACHELINE  __attribute__ ((aligned (32)))
@@ -26,6 +28,8 @@ u8 Buffer[MEMORY_SIZE];
 #else
 u8 Buffer[MEMORY_SIZE] ALIGNMENT_CACHELINE;
 #endif
+
+
 
 /************************** Function Prototypes ******************************/
 
@@ -51,12 +55,17 @@ static volatile int NumIrqs = 0;
 
 #define LED_MIO        0 	//GPIO0 - debug pin on Pluto
 
-#define GPIOPS0_DEV_ID		XPAR_XGPIOPS_0_DEVICE_ID
+#define GPIOPS0_DEV_ID		XPAR_PS7_GPIO_0_DEVICE_ID
 #define GIC_DEV_ID     		XPAR_SCUGIC_0_DEVICE_ID
 #define FINTR_ID        	XPS_FPGA0_INT_ID
 
 #define USB_DEV_ID          XPAR_XUSBPS_0_DEVICE_ID
 #define USB_INTR_ID         XPAR_XUSBPS_0_INTR
+
+
+
+
+
 
 int gpio_init(void) {
 	XGpioPs_Config *GpioCfg;
@@ -108,8 +117,8 @@ static int GicInitOnce(u16 GicDevId) {
 
 static void IrqHandler(void *Ref) {
 	static int led = 0;
-	led ^= 1;
-	XGpioPs_WritePin(&Gpio, LED_MIO, led);
+	//led ^= 1;
+	//XGpioPs_WritePin(&Gpio, LED_MIO, led);
 }
 
 static int ConnectPlIrq(u32 FabricIntrId) {
@@ -152,7 +161,7 @@ int main() {
 			val++;
 			if (val > 24)
 				val = 0;
-			usleep(10);
+			//usleep(10);
 		}
 
 }
