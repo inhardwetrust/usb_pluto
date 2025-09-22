@@ -1,8 +1,11 @@
+//usb_bulk.с
 #include "usb_bulk.h"
 #include "xil_types.h"    // UINTPTR, u8/u32
 #include "xil_cache.h"    // Xil_DCacheFlushRange
 #include <string.h>       // memset
 #include "ringbuf.h"
+#include "nbuffer.h"
+
 
 #include "dma_stuff.h"
 
@@ -25,13 +28,19 @@ static XUsbPs *g_inst = NULL;
 static size_t g_tx_len = 0;
 ringbuf_t rb ALIGNMENT_CACHELINE;
 
+//n-buffer создаем
+nbuffer_t nb ALIGNMENT_CACHELINE;
+
 void usb_bulk_set_instance(XUsbPs *inst) {
 	g_inst = inst;
 }
 
 void usb_bulk_init(void) {
-	init_ringbuf(&rb);
+	//init_ringbuf(&rb);
+	nbuf_init(&nb);
 	dma_init();
+	nbuf_fill_init();
+
 }
 
 static int try_kick_tx(void) {
@@ -97,3 +106,26 @@ size_t rb_write(uint8_t val) {
 
 	return wrote;
 }
+
+__attribute__((optimize("O0"))) void nbuf_fill_init(void) {
+    while (nbuf_can_dma(&nb)) {
+        uint8_t *dst = nbuf_dma_acquire(&nb);
+
+        volatile uintptr_t addr = (uintptr_t)dst;
+
+    	//uint8_t *dst = &nb.data[0];
+        if (!dst) break;
+
+
+        // Блокирующий simple DMA s2mm на весь размер блока
+        dma_s2mm_start(dst, nb.blk_bytes);
+
+        // Готово — помечаем READY и двигаем prod_i
+        nbuf_dma_done(&nb);
+    }
+}
+
+
+
+
+

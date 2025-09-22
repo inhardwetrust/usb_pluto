@@ -135,7 +135,7 @@ int main() {
 
 	gpio_init();
 	usb_bulk_set_gpio(&Gpio, LED_MIO);
-
+	usleep(3);
 	usb_bulk_init();
 
 
@@ -156,13 +156,13 @@ int main() {
 
 		uint8_t val = 1;
 
-		while (1) {
-			rb_write(val);
-			val++;
-			if (val > 24)
-				val = 0;
-			//usleep(10);
-		}
+//		while (1) {
+//			rb_write(val);
+//			val++;
+//			if (val > 24)
+//				val = 0;
+//			//usleep(10);
+//		}
 
 }
 

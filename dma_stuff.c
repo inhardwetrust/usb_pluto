@@ -1,6 +1,7 @@
-
+//nbuffer.c
 #include "xaxidma.h"
 #include "dma_stuff.h"
+#include "nbuffer.h"
 
 static XAxiDma AxiDma;
 
@@ -22,12 +23,16 @@ int dma_s2mm_start(void *dst_buf, size_t nbytes) {
     Xil_DCacheInvalidateRange((UINTPTR)dst_buf, nbytes);
 
     // запустить приём в DDR
-    int st = XAxiDma_SimpleTransfer(&AxiDma, (UINTPTR)dst_buf, nbytes, XAXIDMA_DEVICE_TO_DMA);
+    int st = XAxiDma_SimpleTransfer(&AxiDma, (UINTPTR)dst_buf, 64, XAXIDMA_DEVICE_TO_DMA);
     if (st != XST_SUCCESS) return -4;
 
     // ждать завершения (polling). С IRQ это не нужно.
-    while (XAxiDma_Busy(&AxiDma, XAXIDMA_DEVICE_TO_DMA)) { /* spin */ }
+    while (XAxiDma_Busy(&AxiDma, XAXIDMA_DEVICE_TO_DMA)) {
+    int c=5;
+     }
 
     // область уже валидна (мы её invalid'или перед стартом)
     return 0;
 }
+
+
