@@ -1,3 +1,6 @@
 //DMA
 #define DMA_DEV_ID      XPAR_AXIDMA_0_DEVICE_ID   // из xparameters.h
-#define RX_BYTES        (64)                 // должно совпасть с TLAST у источника
+
+int dma_init(void);
+void nbuf_fill_init(void);
+int dma_s2mm_start(void *dst_buf, size_t nbytes);

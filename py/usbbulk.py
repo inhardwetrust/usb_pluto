@@ -46,12 +46,20 @@ dev.ctrl_transfer(
 # сколько байт читать
 N = 64
 timeout_ms = 2000
-while True:
-    data=None
-    data = ep_in.read(N, timeout=timeout_ms)
-    data = data.tobytes() if hasattr(data, "tobytes") else bytes(data)
+idx = 0  # global index
 
-    print(f"Read {len(data)} bytes:")
-    for b in data:
-        print(b)   # десятичное значение байта
-    #time.sleep(0.5)
+while True:
+        data = ep_in.read(N, timeout=timeout_ms)
+        data = data.tobytes() if hasattr(data, "tobytes") else bytes(data)
+
+        print(f"Read {len(data)} bytes:")
+
+        for off, b in enumerate(data):
+            print(f"{idx + off:08d}: {b}")
+        idx += len(data)
+
+        # Empty string after packet
+        if idx % N == 0:
+            print()
+
+        # time.sleep(0.5)
