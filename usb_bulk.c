@@ -36,7 +36,7 @@ void usb_bulk_set_instance(XUsbPs *inst) {
 void usb_bulk_init(void) {
 	nbuf_init(&nb);
 	dma_init();
-	nbuf_fill_init();
+	//nbuf_fill_init();
 
 }
 
@@ -78,9 +78,9 @@ void Ep1_In_Handler(void *CallBackRef, u8 EpNum, u8 EventType, void *Data) {
 	}
 }
 
-/* =============  Ring buffer and DMA  ============ */
+/* =============  N-buffer and DMA  ============ */
 
-void nbuf_fill_init(void) {
+void nbuf_fill(void) {
     while (nbuf_can_dma(&nb)) {
         uint8_t *dst = nbuf_dma_acquire(&nb);
 

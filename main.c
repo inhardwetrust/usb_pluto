@@ -154,15 +154,10 @@ int main() {
 
 	//blink_led_toggle_20();
 
-		uint8_t val = 1;
 
-//		while (1) {
-//			rb_write(val);
-//			val++;
-//			if (val > 24)
-//				val = 0;
-//			//usleep(10);
-//		}
+		while (1) {
+			nbuf_fill();
+		}
 
 }
 
