@@ -35,9 +35,9 @@ void usb_bulk_set_instance(XUsbPs *inst) {
 
 void usb_bulk_init(void) {
 	nbuf_init(&nb);
-	dma_init();
-	//nbuf_fill_init();
-
+	//dma_init();
+	dma_sg_init_and_start();
+	dma_sg_poll_once();
 }
 
 static int try_kick_tx(void) {

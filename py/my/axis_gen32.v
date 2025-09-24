@@ -1,6 +1,6 @@
 module axis_gen32 #
 (
-  parameter integer BYTES_PER_BLOCK = 32
+  parameter integer BYTES_PER_BLOCK = 64
 )
 (
   input  wire        aclk,
