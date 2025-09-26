@@ -57,7 +57,8 @@ static volatile int NumIrqs = 0;
 
 #define GPIOPS0_DEV_ID		XPAR_PS7_GPIO_0_DEVICE_ID
 #define GIC_DEV_ID     		XPAR_SCUGIC_0_DEVICE_ID
-#define FINTR_ID        	XPS_FPGA0_INT_ID
+#define FINTR_ID        	XPS_FPGA0_INT_ID // IRQ_F2P[0] from main
+#define DMA_S2MM_INTR_ID    XPS_FPGA1_INT_ID
 
 #define USB_DEV_ID          XPAR_XUSBPS_0_DEVICE_ID
 #define USB_INTR_ID         XPAR_XUSBPS_0_INTR
@@ -115,21 +116,27 @@ static int GicInitOnce(u16 GicDevId) {
 	return XST_SUCCESS;
 }
 
-static void IrqHandler(void *Ref) {
+static void IrqHandler0(void *Ref) {
 	static int led = 0;
 	//led ^= 1;
 	//XGpioPs_WritePin(&Gpio, LED_MIO, led);
 }
 
-static int ConnectPlIrq(u32 FabricIntrId) {
-	XScuGic_SetPriorityTriggerType(&Gic, FabricIntrId, 0xB0, 0x3); // 0x1 = level-high, 0x3 = rising-edge
-	int Status = XScuGic_Connect(&Gic, FabricIntrId,
-			(Xil_ExceptionHandler) IrqHandler, NULL);
-	if (Status != XST_SUCCESS)
-		return Status;
-	XScuGic_Enable(&Gic, FabricIntrId);
-	return XST_SUCCESS;
+
+
+static int ConnectPlIrq(u32 FabricIntrId,
+                        u8 priority, u8 triggerType,
+                        Xil_ExceptionHandler Handler,
+                        void *Ref)
+{
+    XScuGic_SetPriorityTriggerType(&Gic, FabricIntrId,
+                                   priority, triggerType);
+    int Status = XScuGic_Connect(&Gic, FabricIntrId, Handler, Ref);
+    if (Status != XST_SUCCESS) return Status;
+    XScuGic_Enable(&Gic, FabricIntrId);
+    return XST_SUCCESS;
 }
+
 
 int main() {
 
@@ -150,7 +157,8 @@ int main() {
 	UsbIntrInit(&UsbInstance, USB_DEV_ID, USB_INTR_ID);
 
 	/* 3) Connect IRQ from PL to the same GIC */
-	ConnectPlIrq(FINTR_ID);
+	ConnectPlIrq(XPS_FPGA0_INT_ID, 0xB0, 0x3, IrqHandler0, NULL); // (bit 0) — rising edge
+	ConnectPlIrq(XPS_FPGA1_INT_ID, 0xA0, 0x1, dma_irq_handler_fp1, NULL); //IRQ_F2P[1]
 
 
 

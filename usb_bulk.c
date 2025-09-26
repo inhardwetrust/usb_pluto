@@ -7,6 +7,7 @@
 
 
 #include "dma_stuff.h"
+#include "xaxidma.h"
 
 #ifndef ALIGNMENT_CACHELINE
 #define ALIGNMENT_CACHELINE __attribute__((aligned(32)))
@@ -36,8 +37,13 @@ void usb_bulk_set_instance(XUsbPs *inst) {
 void usb_bulk_init(void) {
 	nbuf_init(&nb);
 	//dma_init();
-	dma_sg_init_and_start();
-	dma_sg_poll_once();
+
+	dma_sg_setup(&nb);
+
+	//dma_sg_init_and_start(&nb);
+
+
+
 }
 
 static int try_kick_tx(void) {
@@ -62,7 +68,8 @@ static int try_kick_tx(void) {
 
 void usb_stream_start(void) {
 
-	try_kick_tx();
+	//try_kick_tx();
+	dma_sg_hard_restart(&nb);
 }
 
 /* Handle when transfered EP1 IN */
@@ -73,8 +80,38 @@ void Ep1_In_Handler(void *CallBackRef, u8 EpNum, u8 EventType, void *Data) {
 	XGpioPs_WritePin(g_gpio, g_gpio_pin, 1);
 
 	if (EventType == XUSBPS_EP_EVENT_DATA_TX) {
-		nbuf_usb_done(&nb);        // USB_BUSY -> FREE, cons_i++
-		try_kick_tx();
+
+		// продолжаем возращать буфер в очередь
+
+		XAxiDma_Bd *bd;
+		if (XAxiDma_BdRingAlloc(nb.rx_ring, 1, &bd) != XST_SUCCESS) return;
+
+		// готовим буфер для S2MM (DMA будет ПИСАТЬ сюда)
+		uint8_t *p = nbuf_ptr(&nb, nb.bd_idx);
+		Xil_DCacheInvalidateRange((UINTPTR)p, nb.blk_bytes);
+
+		// настроить BD заново под этот же буфер
+		int st = 0;
+		st |= XAxiDma_BdSetBufAddr(bd, (UINTPTR)p);
+		st |= XAxiDma_BdSetLength (bd, nb.blk_bytes, nb.rx_ring->MaxTransferLen);
+		XAxiDma_BdSetId(bd, (UINTPTR)nb.bd_idx);
+		if (st != XST_SUCCESS) { XAxiDma_BdRingUnAlloc(nb.rx_ring, 1, bd); return; }
+
+		// (не обязательно, но ок) flush самой записи BD
+		Xil_DCacheFlushRange((UINTPTR)bd, BD_ALIGN);
+
+		// отдать BD железу
+		if (XAxiDma_BdRingToHw(nb.rx_ring, 1, bd) == XST_SUCCESS) {
+			nbuf_usb_done(&nb);
+		} else {
+		    XAxiDma_BdRingUnAlloc(nb.rx_ring, 1, bd);
+		}
+
+
+
+
+		//nbuf_usb_done(&nb);        // USB_BUSY -> FREE, cons_i++
+		//try_kick_tx();
 	}
 }
 
@@ -94,6 +131,41 @@ void nbuf_fill(void) {
 }
 
 
+void dma_irq_handler_fp1(void *Ref) {
+	//XGpioPs_WritePin(g_gpio, g_gpio_pin, 0);
 
+	XAxiDma_BdRing *rx = nb.rx_ring;
+
+	u32 s = XAxiDma_BdRingGetIrq(rx); // reading status register
+	    if (!s) return;
+	    XAxiDma_BdRingAckIrq(rx, s);  // reset all flags
+
+	    if (s & XAXIDMA_IRQ_ERROR_MASK) {
+	        return;
+	    }
+
+	    // fetch ONLY 1 ready BD
+	    XAxiDma_Bd *bd_done = NULL;
+	    int n = XAxiDma_BdRingFromHw(rx, 1, &bd_done);
+	    if (n != 1) return;
+
+	    nb.bd_idx= (int)XAxiDma_BdGetId(bd_done);
+	    //int idx = (int)XAxiDma_BdGetId(bd_done);
+	    UINTPTR addr = XAxiDma_BdGetBufAddr(bd_done);
+	    Xil_DCacheInvalidateRange(addr, nb.blk_bytes);
+
+	    nb.st[nb.bd_idx]      = NBUF_READY;
+	    XAxiDma_BdRingFree(nb.rx_ring, 1, bd_done); // First part of task - return buffer to HQ que
+
+
+	    try_kick_tx();
+	    nb.st[nb.bd_idx]      = NBUF_USB_BUSY;
+
+
+
+
+
+
+}
 
 

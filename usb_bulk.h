@@ -10,3 +10,5 @@ void Ep1_In_Handler(void *CallBackRef, u8 EpNum, u8 EventType, void *Data);
 void usb_bulk_set_gpio(XGpioPs *gpio, uint32_t pin);
 
 void nbuf_fill(void);
+
+void dma_irq_handler_fp1(void *Ref) ;
