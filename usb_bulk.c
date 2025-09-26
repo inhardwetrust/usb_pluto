@@ -40,13 +40,16 @@ void usb_bulk_init(void) {
 
 	dma_sg_setup(&nb);
 
-	//dma_sg_init_and_start(&nb);
 
 
 
 }
 
 static int try_kick_tx(void) {
+
+	if (nb.usb_tx_idx >= 0) {
+	        return 1;
+	    }
 
 	if (!nbuf_can_usb(&nb))        // no more ready blocks
 	        return 1;
@@ -117,18 +120,7 @@ void Ep1_In_Handler(void *CallBackRef, u8 EpNum, u8 EventType, void *Data) {
 
 /* =============  N-buffer and DMA  ============ */
 
-void nbuf_fill(void) {
-    while (nbuf_can_dma(&nb)) {
-        uint8_t *dst = nbuf_dma_acquire(&nb);
 
-        if (!dst) break;
-
-        // Blocking simple DMA s2mm for whole size block
-        dma_s2mm_start(dst, nb.blk_bytes);
-
-        nbuf_dma_done(&nb);
-    }
-}
 
 
 void dma_irq_handler_fp1(void *Ref) {
@@ -159,7 +151,7 @@ void dma_irq_handler_fp1(void *Ref) {
 
 
 	    try_kick_tx();
-	    nb.st[nb.bd_idx]      = NBUF_USB_BUSY;
+
 
 
 
