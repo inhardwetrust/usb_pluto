@@ -140,8 +140,8 @@ static int ConnectPlIrq(u32 FabricIntrId,
 
 int main() {
 
-	//Xil_DCacheDisable();
-	//Xil_ICacheDisable();
+//	Xil_DCacheDisable();
+//	Xil_ICacheDisable();
 
 	gpio_init();
 	usb_bulk_set_gpio(&Gpio, LED_MIO);
@@ -229,7 +229,7 @@ static int UsbIntrInit(XUsbPs *UsbInstancePtr, u16 UsbDeviceId, u16 UsbIntrId) {
 	DeviceConfig.EpCfg[1].Out.BufSize = 512;
 	DeviceConfig.EpCfg[1].Out.MaxPacketSize = 512;
 	DeviceConfig.EpCfg[1].In.Type = XUSBPS_EP_TYPE_BULK;
-	DeviceConfig.EpCfg[1].In.NumBufs = 1;
+	DeviceConfig.EpCfg[1].In.NumBufs = 32;
 	DeviceConfig.EpCfg[1].In.MaxPacketSize = 512;
 
 	DeviceConfig.NumEndpoints = NumEndpoints;

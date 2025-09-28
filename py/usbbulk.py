@@ -44,7 +44,7 @@ dev.ctrl_transfer(
 
 
 # сколько байт читать
-N = 512
+N = 16384
 timeout_ms = 2000
 idx = 0  # global index
 

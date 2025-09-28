@@ -44,7 +44,7 @@ dev.ctrl_transfer(
 
 
 # сколько байт читать
-N = 1024
+N = 16384
 timeout_ms = 2000
 
 

@@ -48,22 +48,32 @@ void usb_bulk_init(void) {
 static int try_kick_tx(void) {
 
 
+
 	if (!nbuf_can_usb(&nb))        // no more ready blocks
-	        return 1;
+	{
+	//	XGpioPs_WritePin(g_gpio, g_gpio_pin, 1);
+		 return 1;
+	} else {
+		XGpioPs_WritePin(g_gpio, g_gpio_pin, 0);
+	}
 
 	size_t n = nb.blk_bytes;
 
 
 
 	uint8_t *ptr = nbuf_usb_acquire(&nb);   // READY -> USB_BUSY
-	    if (!ptr) return 1;
+	    if (!ptr) {
+	    	//XGpioPs_WritePin(g_gpio, g_gpio_pin, 1);
+	    	return 1;
+	    }
 
 	Xil_DCacheFlushRange((UINTPTR) ptr, n); //
 	int st = XUsbPs_EpBufferSend(g_inst, /*ep=*/1, ptr, n);
 	if (st == XST_SUCCESS) {
-		g_tx_len = n; /// how much we loaded for sending
 		XGpioPs_WritePin(g_gpio, g_gpio_pin, 0);
 
+	} else {
+		//XGpioPs_WritePin(g_gpio, g_gpio_pin, 1);
 	}
 	return st;
 }
@@ -79,7 +89,7 @@ void Ep1_In_Handler(void *CallBackRef, u8 EpNum, u8 EventType, void *Data) {
 	(void) EpNum;
 	(void) CallBackRef;
 
-	XGpioPs_WritePin(g_gpio, g_gpio_pin, 1);
+	//XGpioPs_WritePin(g_gpio, g_gpio_pin, 1);
 
 	if (EventType == XUSBPS_EP_EVENT_DATA_TX) {
 
@@ -137,7 +147,10 @@ void dma_irq_handler_fp1(void *Ref) {
 	    // fetch ONLY 1 ready BD
 	    XAxiDma_Bd *bd_done = NULL;
 	    int n = XAxiDma_BdRingFromHw(rx, 1, &bd_done);
-	    if (n != 1) return;
+	    if (n != 1) {
+	    	XGpioPs_WritePin(g_gpio, g_gpio_pin, 1);
+	    	return;
+	    }
 
 	    nb.bd_idx= (int)XAxiDma_BdGetId(bd_done);
 	    UINTPTR addr = XAxiDma_BdGetBufAddr(bd_done);
