@@ -140,8 +140,8 @@ static int ConnectPlIrq(u32 FabricIntrId,
 
 int main() {
 
-	Xil_DCacheDisable();
-	Xil_ICacheDisable();
+	//Xil_DCacheDisable();
+	//Xil_ICacheDisable();
 
 	gpio_init();
 	usb_bulk_set_gpio(&Gpio, LED_MIO);

@@ -47,14 +47,13 @@ void usb_bulk_init(void) {
 
 static int try_kick_tx(void) {
 
-	if (nb.usb_tx_idx >= 0) {
-	        return 1;
-	    }
 
 	if (!nbuf_can_usb(&nb))        // no more ready blocks
 	        return 1;
 
 	size_t n = nb.blk_bytes;
+
+
 
 	uint8_t *ptr = nbuf_usb_acquire(&nb);   // READY -> USB_BUSY
 	    if (!ptr) return 1;
@@ -104,12 +103,10 @@ void Ep1_In_Handler(void *CallBackRef, u8 EpNum, u8 EventType, void *Data) {
 		Xil_DCacheFlushRange((UINTPTR)bd, BD_ALIGN);
 
 		// отдать BD железу
-		if (XAxiDma_BdRingToHw(nb.rx_ring, 1, bd) == XST_SUCCESS) {
-			nbuf_usb_done(&nb);
-		} else {
-		    XAxiDma_BdRingUnAlloc(nb.rx_ring, 1, bd);
-		}
+		st=XAxiDma_BdRingToHw(nb.rx_ring, 1, bd);
 
+		nbuf_usb_done(&nb);
+		try_kick_tx();
 
 
 
@@ -128,6 +125,7 @@ void dma_irq_handler_fp1(void *Ref) {
 
 	XAxiDma_BdRing *rx = nb.rx_ring;
 
+
 	u32 s = XAxiDma_BdRingGetIrq(rx); // reading status register
 	    if (!s) return;
 	    XAxiDma_BdRingAckIrq(rx, s);  // reset all flags
@@ -142,11 +140,10 @@ void dma_irq_handler_fp1(void *Ref) {
 	    if (n != 1) return;
 
 	    nb.bd_idx= (int)XAxiDma_BdGetId(bd_done);
-	    //int idx = (int)XAxiDma_BdGetId(bd_done);
 	    UINTPTR addr = XAxiDma_BdGetBufAddr(bd_done);
 	    Xil_DCacheInvalidateRange(addr, nb.blk_bytes);
 
-	    nb.st[nb.bd_idx]      = NBUF_READY;
+	    nbuf_dma_done(&nb);
 	    XAxiDma_BdRingFree(nb.rx_ring, 1, bd_done); // First part of task - return buffer to HQ que
 
 
