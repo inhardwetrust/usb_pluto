@@ -6,6 +6,5 @@ DMA SG Mode debug!
 Speed
 This design(software) is "One in flight".
 It allows us to have 
-131.071 Mbit/s  (16.384 MB/s)  |    1000.0 pkt/s
-
-in next step we will try to payload next usb when previous was not sent yet.
+260.149 Mbit/s  (32.519 MB/s)  |     992.4 pkt/s 
+Thi is maximum for USB. More packet size doesn't help.

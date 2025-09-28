@@ -73,6 +73,7 @@ static int try_kick_tx(void) {
 		XGpioPs_WritePin(g_gpio, g_gpio_pin, 0);
 
 	} else {
+		nbuf_usb_unacquire();
 		//XGpioPs_WritePin(g_gpio, g_gpio_pin, 1);
 	}
 	return st;
@@ -116,7 +117,7 @@ void Ep1_In_Handler(void *CallBackRef, u8 EpNum, u8 EventType, void *Data) {
 		st=XAxiDma_BdRingToHw(nb.rx_ring, 1, bd);
 
 		nbuf_usb_done(&nb);
-		try_kick_tx();
+
 
 
 
@@ -148,7 +149,9 @@ void dma_irq_handler_fp1(void *Ref) {
 	    XAxiDma_Bd *bd_done = NULL;
 	    int n = XAxiDma_BdRingFromHw(rx, 1, &bd_done);
 	    if (n != 1) {
-	    	XGpioPs_WritePin(g_gpio, g_gpio_pin, 1);
+	    	if (n != 0) {
+	    		XGpioPs_WritePin(g_gpio, g_gpio_pin, 1);
+	    	}
 	    	return;
 	    }
 
