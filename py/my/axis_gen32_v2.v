@@ -1,4 +1,4 @@
-module axis_gen32 #
+module axis_gen32_v2 #
 (
   parameter integer BYTES_PER_BLOCK = 64
 )
@@ -18,7 +18,7 @@ localparam integer WORDS_PER_BLOCK = BYTES_PER_BLOCK/4;
 assign tkeep = 4'hF;  // all 4 bytes valid every beat
 
 reg [31:0] data_r;
-reg [31:0]  cnt;
+reg [31:0] cnt;
 reg        valid_r;
 reg        last_pending;   // we are at the last word; hold until hs
 
@@ -36,24 +36,27 @@ always @(posedge aclk) begin
     last_pending <= 1'b0;
     cnt          <= 32'd0;
     data_r       <= {8'hAA,8'hAA,8'hAA,8'd0};
-  end else if (!en) begin
-    // S2MM channel not started - keep silent
-    valid_r      <= 1'b0;
-    last_pending <= 1'b0;
-    cnt          <= 32'd0;
-    data_r       <= {8'hAA,8'hAA,8'hAA,8'd0};
   end else begin
+
     // start of frame
     if (!valid_r) begin
-      valid_r      <= 1'b1;
-      last_pending <= (WORDS_PER_BLOCK==1);
-      cnt          <= 32'd0;
-      data_r       <= {8'hAA,8'hAA,8'hAA,8'd0}; // first beat is already on the bus
+      if (en) begin // CHG: Start only when EN
+        valid_r      <= 1'b1;
+        last_pending <= (WORDS_PER_BLOCK==1);
+        cnt          <= 32'd0;
+        data_r       <= {8'hAA,8'hAA,8'hAA,8'd0}; // first beat is already on the bus
+      end else begin
+        // ???????? ? idle, ???????? ?? ?????????
+        valid_r      <= 1'b0;
+        last_pending <= 1'b0;
+        cnt          <= 32'd0;
+        data_r       <= {8'hAA,8'hAA,8'hAA,8'd0};
+      end
     end else if (hs) begin
       // handshake of the current word
       if (last_pending) begin
         // this was the last beat - frame done
-        valid_r      <= 1'b0;
+        valid_r      <= 1'b0;     // CHG: End frame while en=0
         last_pending <= 1'b0;
         cnt          <= 32'd0;
         data_r       <= {8'hAA,8'hAA,8'hAA,8'd0};
