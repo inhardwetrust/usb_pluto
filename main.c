@@ -15,6 +15,10 @@
 #include "xusbps_ch9.h"
 
 
+#include "ad9361_api.h"
+
+#define XILINX_PLATFORM
+#define AXI_ADC_NOT_PRESENT
 
 /************************** Constant Definitions *****************************/
 
@@ -54,6 +58,8 @@ static XUsbPs_Local UsbLocal;
 static volatile int NumIrqs = 0;
 
 #define LED_MIO        0 	//GPIO0 - debug pin on Pluto
+#define RSTPIN_EMIO       54   // reset ADI
+#define PS_GPIO6        6
 
 #define GPIOPS0_DEV_ID		XPAR_PS7_GPIO_0_DEVICE_ID
 #define GIC_DEV_ID     		XPAR_SCUGIC_0_DEVICE_ID
@@ -84,6 +90,15 @@ int gpio_init(void) {
 	XGpioPs_SetDirectionPin(&Gpio, LED_MIO, 1);
 	XGpioPs_SetOutputEnablePin(&Gpio, LED_MIO, 1);
 	XGpioPs_WritePin(&Gpio, LED_MIO, 1);   // Initial value
+
+	// LED_ENIO configuration - for debug
+	XGpioPs_SetDirectionPin(&Gpio, RSTPIN_EMIO, 1);
+	XGpioPs_SetOutputEnablePin(&Gpio, RSTPIN_EMIO, 1);
+
+	//XGpioPs_SetDirectionPin(&Gpio, PS_GPIO6, 1);
+	//XGpioPs_SetOutputEnablePin(&Gpio, PS_GPIO6, 1);
+
+    //XGpioPs_WritePin(&Gpio, PS_GPIO6, 0);
 
 	return XST_SUCCESS;
 }
@@ -138,37 +153,132 @@ static int ConnectPlIrq(u32 FabricIntrId,
 }
 
 
+int32_t ad9361_reset_my(struct ad9361_rf_phy *phy)
+{
+	if (1) {
+		XGpioPs_SetDirectionPin(&Gpio, RSTPIN_EMIO, 0);
+		no_os_mdelay(1);
+		XGpioPs_SetDirectionPin(&Gpio, RSTPIN_EMIO, 1);
+		no_os_mdelay(1);
+		return 0;
+	}
+
+	/* SPI Soft Reset was removed from the register map, since it doesn't
+	 * work reliably. Without a prober HW reset randomness may happen.
+	 * Please specify a RESET GPIO.
+	 */
+
+	ad9361_spi_write(phy->spi, REG_SPI_CONF, SOFT_RESET | _SOFT_RESET);
+	ad9361_spi_write(phy->spi, REG_SPI_CONF, 0x0);
+	dev_err(&phy->spi->dev,
+		"%s: by SPI, this may cause unpredicted behavior!", __func__);
+
+	return -ENODEV;
+}
+
+
 int main() {
 
 //	Xil_DCacheDisable();
 //	Xil_ICacheDisable();
 
 	gpio_init();
-	usb_bulk_set_gpio(&Gpio, LED_MIO);
-	usleep(3);
-	usb_bulk_init();
+	adi_set_gpio(&Gpio, RSTPIN_EMIO ); //RSTPIN_EMIO
 
 
-	GicInitOnce(GIC_DEV_ID); /* 1) Init GIC once */
+
+
+	//usb_bulk_set_gpio(&Gpio, LED_MIO);
+
+
+
+	//usleep(3);
+	//usb_bulk_init();
+
+
+	//GicInitOnce(GIC_DEV_ID); /* 1) Init GIC once */
 
 	/* 2) Init USB controller + its IRQ */
-	UsbLocal.CurrentConfig = 0;
-	UsbInstance.UserDataPtr = &UsbLocal;
-	UsbIntrInit(&UsbInstance, USB_DEV_ID, USB_INTR_ID);
+	//UsbLocal.CurrentConfig = 0;
+	//UsbInstance.UserDataPtr = &UsbLocal;
+	//UsbIntrInit(&UsbInstance, USB_DEV_ID, USB_INTR_ID);
 
 	/* 3) Connect IRQ from PL to the same GIC */
-	ConnectPlIrq(XPS_FPGA0_INT_ID, 0xB0, 0x3, IrqHandler0, NULL); // (bit 0) — rising edge
-	ConnectPlIrq(XPS_FPGA1_INT_ID, 0xA0, 0x1, dma_irq_handler_fp1, NULL); //IRQ_F2P[1]
+	//ConnectPlIrq(XPS_FPGA0_INT_ID, 0xB0, 0x3, IrqHandler0, NULL); // (bit 0) — rising edge
+	//ConnectPlIrq(XPS_FPGA1_INT_ID, 0xA0, 0x1, dma_irq_handler_fp1, NULL); //IRQ_F2P[1]
 
 
 
 
 	//blink_led_toggle_20();
+	//XGpioPs_WritePin(&Gpio, RSTPIN_EMIO, 1);
 
+	//XGpioPs_WritePin(&Gpio, RSTPIN_EMIO, 1);
+	//spi_init_ps();
 
+	//my working!!!!
+	//adi_spi_prepare();
+	//reset_init_and_pulse();
+
+	static AD9361_InitParam initp = {
+	    .dev_sel = ID_AD9361,
+	    .reference_clk_rate = 40000000UL, // твой REFCLK
+	    .two_rx_two_tx_mode_enable = 1,
+	    .one_rx_one_tx_mode_use_rx_num = 1,
+	    .one_rx_one_tx_mode_use_tx_num = 1,
+	    .frequency_division_duplex_mode_enable = 1,
+	    .trx_synthesizer_target_fref_overwrite_hz = MAX_SYNTH_FREF,
+
+	    // Частоты LO для smoke-test (подставь свои)
+	    .rx_synthesizer_frequency_hz = 2400000000UL,
+	    .tx_synthesizer_frequency_hz = 2400000000UL,
+
+	    // Цифровой интерфейс по умолчанию LVDS (как у Pluto/FMCOMMS)
+	    .lvds_mode_enable = 1,
+	    .lvds_rx_onchip_termination_enable = 1,
+
+	    // GPIO resetb/прочее — заполним ниже (после platform_ops)
+	    .gpio_resetb = { .number = -1 },
+	    .gpio_sync   = { .number = -1 },
+	    .gpio_cal_sw1= { .number = -1 },
+	    .gpio_cal_sw2= { .number = -1 },
+
+	    // SPI к AD9361
+	    .spi_param = {
+	        .device_id = 0,
+	        .chip_select = 0,
+	        .mode = NO_OS_SPI_MODE_1, // CPOL=0, CPHA=1
+	        // platform_ops/extra зададим в main()
+	    },
+	};
+
+	struct ad9361_rf_phy *phy = NULL;
+
+	//ad9361_reset(phy);
+	ad9361_reset_my(phy);
+	XGpioPs_WritePin(&Gpio, RSTPIN_EMIO, 0);
+	no_os_mdelay(1);
+	XGpioPs_WritePin(&Gpio, RSTPIN_EMIO, 1);
+	no_os_mdelay(1);
+
+	struct no_os_spi_desc *spi = NULL;
+	no_os_spi_init(&spi, &initp.spi_param);
+
+	int32_t ret = 0;
 		while (1) {
-		//	nbuf_fill();
+
+
+
+
+			//my_spi();
+			//my_spi_adi();
+
+			ret = ad9361_spi_read(phy->spi, REG_PRODUCT_ID);
+			//ret = ad9361_spi_readm(spi, reg, &buf, 1);
+			usleep(10);
 		}
+		//val ^= 1;
+		//XGpioPs_WritePin(&Gpio, RSTPIN_EMIO, val);
 
 }
 
